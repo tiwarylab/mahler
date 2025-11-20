@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tempo"
+version = "0.1.0"
+description = "TEMPO CLI backbone"
+readme = "README.md"
+authors = [
+  { name = "Da Teng", email = "tengda1997@gmail.com" }
+]
+maintainers = [
+  { name = "Tiwary Lab" }
+]
+requires-python = ">=3.11"
+license = { file = "LICENSE" }
+dependencies = [
+  "af2rave @ git+https://github.com/tiwarylab/af2rave.git"
+]
+keywords = ["cli"]
+
+[project.urls]
+Homepage = "https://github.com/tiwarylab/tempo"
+Repository = "https://github.com/tiwarylab/tempo"
+
+[project.scripts]
+tempo = "tempo.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["tempo*"]
