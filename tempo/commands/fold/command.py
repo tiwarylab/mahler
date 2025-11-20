@@ -13,10 +13,24 @@ class FoldCommand:
 
     @staticmethod
     def configure_parser(parser: argparse.ArgumentParser) -> None:
-        parser.add_argument("--sequence", help="Path to the input sequence file.")
-        parser.add_argument("--template", help="Path to the template structure directory.")
-        parser.add_argument("--output", help="Path for storing generated structures.")
+        parser.add_argument(
+            "--sequence", 
+            required=True,
+            help="Path to the input sequence file."
+        )
+        parser.add_argument(
+            "--template", 
+            default=None,
+            help="Path to the template structure directory."
+        )
+        parser.add_argument(
+            "--output", 
+            default="structures/",
+            help="Path for storing generated structures.",
+        )
 
     @staticmethod
     def run(args: argparse.Namespace) -> int:
-        raise NotImplementedError("`tempo fold` is not implemented yet.")
+        from .alphafold import predict, post_process
+        predict(args.sequence, args.template)
+        post_process("alphafold", args.output)

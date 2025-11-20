@@ -5,12 +5,12 @@ from __future__ import annotations
 import argparse
 import logging
 import sys
-from typing import Iterable, Sequence, Type
+from collections.abc import Sequence
 
 from .commands import Command, available_commands
 
 
-def build_parser(commands: Sequence[Type[Command]]) -> argparse.ArgumentParser:
+def build_parser(commands: Sequence[Command]) -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="tempo",
         description="TEMPO: Transferable Estimation via Metadynamics of Perturbations in Off-rates",
@@ -31,7 +31,7 @@ def build_parser(commands: Sequence[Type[Command]]) -> argparse.ArgumentParser:
 
 
 def dispatch(args: argparse.Namespace) -> int:
-    handler: Type[Command] | None = getattr(args, "handler", None)
+    handler: Command | None = getattr(args, "handler", None)
     if handler is None:
         # argparse will print usage when return code non-zero
         return 1

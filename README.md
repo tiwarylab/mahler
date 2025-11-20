@@ -29,3 +29,4 @@ The scaffold ships with the following example commands:
 - `tempo rave` will run the RAVE protocol and acquire a latent space.
 - `tempo ifmetad` represents infrequent metadynamics workflows.
 - `tempo reweight` will reweight collected trajectories.
+- `tempo mdprep` will cluster MD trajectories via `--n_clusters` and optionally align to a reference PDB via `--reference`.

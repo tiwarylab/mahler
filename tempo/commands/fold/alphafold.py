@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+__all__ = ["predict", "post_process"]
+
 try:  # pragma: no cover - optional dependency
     import af2rave.alphafold as af2fold
 except ModuleNotFoundError as exc:  # pragma: no cover
@@ -13,7 +15,7 @@ else:
     _IMPORT_ERROR = None
 
 
-def predict(sequence: str, template: str, output_prefix: str = "output") -> None:
+def predict(sequence: str, template: str, output_prefix: str = "alphafold") -> None:
     """Run AlphaFold predictions across a preset panel of MSA depths."""
     if af2fold is None:
         raise ModuleNotFoundError(
@@ -34,13 +36,13 @@ def predict(sequence: str, template: str, output_prefix: str = "output") -> None
     af.predict(msa="520:5120", output_dir=f"{output_prefix}/msa_full", **params)
 
 
-def post_process(output_prefix: str = "output") -> None:
+def post_process(output_prefix: str = "alphafold", destination: str = "structures") -> None:
     """Collect AlphaFold structures into a single directory with readable names."""
     base = Path(output_prefix)
     if not base.exists():
         raise FileNotFoundError(f"{base} does not exist")
 
-    structures_dir = base / "structures"
+    structures_dir = base / destination
     structures_dir.mkdir(parents=True, exist_ok=True)
 
     for subdir in base.iterdir():
