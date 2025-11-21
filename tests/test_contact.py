@@ -6,7 +6,7 @@ import mdtraj as md
 import numpy as np
 import pytest
 
-from tempo.utils.contact import NativeContact
+from mahler.utils.contact import NativeContact
 
 
 @pytest.fixture(scope="module")

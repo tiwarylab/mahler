@@ -1,4 +1,4 @@
-"""Implementation of `tempo info`."""
+"""Implementation of `mahler info`."""
 
 from __future__ import annotations
 
@@ -53,7 +53,7 @@ class InfoCommand:
     """Display basic diagnostic information about the CLI environment."""
 
     name = "info"
-    help = "Display TEMPO CLI and environment information."
+    help = "Display MAHLER CLI and environment information."
 
     @staticmethod
     def configure_parser(parser: argparse.ArgumentParser) -> None:
@@ -67,7 +67,7 @@ class InfoCommand:
     def run(args: argparse.Namespace) -> int:
         torch_version, cuda_version = _torch_versions()
         payload = {
-            "name": "tempo",
+            "name": "mahler",
             "version": __version__,
             "platform": platform.platform(),
             "node": platform.node(),
@@ -81,7 +81,7 @@ class InfoCommand:
         if args.json:
             print(json.dumps(payload, indent=2))
         else:
-            print(f"TEMPO version {payload['version']}")
+            print(f"MAHLER version {payload['version']}")
             print(f"Platform: {payload['platform']}")
             print(f"Node:     {payload['node']}")
             print(f"Python:   {payload['python_version']}")

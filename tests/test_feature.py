@@ -8,8 +8,8 @@ import pytest
 pytest.importorskip("af2rave.feature")
 from af2rave.feature import FeatureSelection
 
-from tempo.commands.mdprep import feature
-from tempo.utils.contact import NativeContact
+from mahler.commands.mdprep import feature
+from mahler.utils.contact import NativeContact
 
 
 @pytest.fixture(scope="module")

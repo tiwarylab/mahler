@@ -1,4 +1,4 @@
-"""`tempo reweight` command stub."""
+"""`mahler reweight` command stub."""
 
 from __future__ import annotations
 
@@ -20,4 +20,4 @@ class ReweightCommand:
 
     @staticmethod
     def run(args: argparse.Namespace) -> int:
-        raise NotImplementedError("`tempo reweight` is not implemented yet.")
+        raise NotImplementedError("`mahler reweight` is not implemented yet.")

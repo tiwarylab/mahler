@@ -1,11 +1,11 @@
-"""Smoke tests for the Tempo CLI backbone."""
+"""Smoke tests for the MAHLER CLI backbone."""
 
 from __future__ import annotations
 
 import argparse
 
-from tempo import cli
-from tempo.commands import available_commands
+from mahler import cli
+from mahler.commands import available_commands
 
 
 def test_parser_registers_known_commands() -> None:

@@ -1,4 +1,4 @@
-"""`tempo rave` command stub."""
+"""`mahler rave` command stub."""
 
 from __future__ import annotations
 
@@ -20,4 +20,4 @@ class RaveCommand:
 
     @staticmethod
     def run(args: argparse.Namespace) -> int:
-        raise NotImplementedError("`tempo rave` is not implemented yet.")
+        raise NotImplementedError("`mahler rave` is not implemented yet.")

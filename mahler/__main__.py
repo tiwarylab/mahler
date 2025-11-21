@@ -1,4 +1,4 @@
-"""Allow `python -m tempo` execution."""
+"""Allow `python -m mahler` execution."""
 
 from __future__ import annotations
 

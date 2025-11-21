@@ -1,4 +1,4 @@
-"""`tempo fold` command stub."""
+"""`mahler fold` command stub."""
 
 from __future__ import annotations
 

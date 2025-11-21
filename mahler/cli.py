@@ -1,4 +1,4 @@
-"""Entry point for the `tempo` command-line interface."""
+"""Entry point for the `mahler` command-line interface."""
 
 from __future__ import annotations
 
@@ -12,8 +12,10 @@ from .commands import Command, available_commands
 
 def build_parser(commands: Sequence[Command]) -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="tempo",
-        description="TEMPO: Transferable Estimation via Metadynamics of Perturbations in Off-rates",
+        prog="mahler",
+        description=(
+            "MAHLER: Metadynamics-Anchored Hybrid Learning for Engineering off-Rates"
+        ),
     )
     parser.add_argument(
         "--debug",
@@ -46,10 +48,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.command is None:
         parser.print_help()
         return 0
-    # Keep third-party loggers quiet and only elevate tempo's logger when debugging.
+    # Keep third-party loggers quiet and only elevate MAHLER logs when debugging.
     logging.basicConfig(level=logging.WARNING)
-    tempo_logger = logging.getLogger("tempo")
-    tempo_logger.setLevel(logging.DEBUG if args.debug else logging.INFO)
+    mahler_logger = logging.getLogger("mahler")
+    mahler_logger.setLevel(logging.DEBUG if args.debug else logging.INFO)
     return dispatch(args)
 
 

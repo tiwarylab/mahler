@@ -3,9 +3,9 @@ requires = ["setuptools>=69", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "tempo"
+name = "mahler"
 version = "0.1.0"
-description = "TEMPO CLI backbone"
+description = "MAHLER CLI backbone"
 readme = "README.md"
 authors = [
   { name = "Da Teng", email = "tengda1997@gmail.com" }
@@ -22,11 +22,11 @@ dependencies = [
 keywords = ["cli"]
 
 [project.urls]
-Homepage = "https://github.com/tiwarylab/tempo"
-Repository = "https://github.com/tiwarylab/tempo"
+Homepage = "https://github.com/tiwarylab/mahler"
+Repository = "https://github.com/tiwarylab/mahler"
 
 [project.scripts]
-tempo = "tempo.cli:main"
+mahler = "mahler.cli:main"
 
 [tool.setuptools.packages.find]
-include = ["tempo*"]
+include = ["mahler*"]

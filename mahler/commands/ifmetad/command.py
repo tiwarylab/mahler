@@ -1,4 +1,4 @@
-"""`tempo ifmetad` command stub."""
+"""`mahler ifmetad` command stub."""
 
 from __future__ import annotations
 
@@ -20,4 +20,4 @@ class IfMetadCommand:
 
     @staticmethod
     def run(args: argparse.Namespace) -> int:
-        raise NotImplementedError("`tempo ifmetad` is not implemented yet.")
+        raise NotImplementedError("`mahler ifmetad` is not implemented yet.")

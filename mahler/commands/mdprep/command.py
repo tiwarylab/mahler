@@ -1,4 +1,4 @@
-"""`tempo mdprep` command stub."""
+"""`mahler mdprep` command stub."""
 
 from __future__ import annotations
 

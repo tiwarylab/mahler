@@ -12,7 +12,7 @@ from sklearn.decomposition import PCA
 from sklearn.cluster import KMeans
 import pickle
 
-from tempo.utils.contact import NativeContact
+from mahler.utils.contact import NativeContact
 
 LOGGER = logging.getLogger(__name__)
 
