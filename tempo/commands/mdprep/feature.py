@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+import logging
+from pathlib import Path
 
 from af2rave.feature import FeatureSelection
 from af2rave.simulation import SimulationBox
@@ -8,8 +10,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.decomposition import PCA
 from sklearn.cluster import KMeans
+import pickle
 
 from tempo.utils.contact import NativeContact
+
+LOGGER = logging.getLogger(__name__)
 
 
 def execute(
@@ -25,38 +30,65 @@ def execute(
         random_seed: int = 42,
         qval_cutoff: float = 0.85
 ):
-    
+    LOGGER.info("Starting mdprep workflow for prefix '%s'", prefix)
+
     if prefix == output_dir:
         raise ValueError("Input and output directories cannot be the same.")
+    output_dir_path = Path(output_dir)
+    output_dir_path.mkdir(parents=True, exist_ok=True)
 
     fs = _load(prefix, ref, steric_clash_cutoff)
+    LOGGER.debug("Loaded feature selection with %d structures", len(fs.pdb_name))
 
     # Find chain_id (0-based) from one-letter chain names in PDB
     antigen_chains = _find_chains(fs, ag_chains)
     antibody_chains = _find_chains(fs, ab_chains)
+    LOGGER.debug("Antigen chains resolved to indices: %s", antigen_chains)
+    LOGGER.debug("Antibody chains resolved to indices: %s", antibody_chains)
 
     # Build native contacts and feature selections
     nc = _build_native_contacts(fs, antigen_chains, antibody_chains)
     selection_string = _get_feature_selection_string(
         fs, nc.contacts_residues, include_cb, antigen_chains, antibody_chains
     )
+    LOGGER.debug("Constructed %d native contacts", len(nc.contacts))
     feature_names = _select_features(fs, selection_string, n_features, output_dir)
+    LOGGER.info("Selected top %d features", len(feature_names))
 
     # remove structures with q-val too low
     qval = _filter_by_qval(fs, nc, qval_cutoff)
+    LOGGER.info("Filtered structures; %d remain above qval %.2f", len(qval), qval_cutoff)
 
     # cluster into centers
     center_id = _cluster(fs, feature_names, n_clusters, 
                          output_dir=output_dir, random_seed=random_seed, qval=qval)
+    LOGGER.info("Identified %d cluster centers", len(center_id))
 
     # Save PDBs
-    _box_structures(fs, center_id, output_dir)
+    _box_structures(fs, feature_names, center_id, output_dir)
+    LOGGER.info("Boxed structures written to %s", output_dir)
 
     
 def _load(prefix: str, ref: str | None = None, steric_clash_cutoff: float = 1.0) -> FeatureSelection:
-    """Return a FeatureSelection filtered by the provided steric-clash cutoff."""
+    """Return a FeatureSelection, loading/saving a cache to avoid reprocessing."""
+    cache_path = Path(prefix, "feature_selection.pkl")
+    if cache_path.exists():
+        LOGGER.debug("Loading FeatureSelection cache from %s", cache_path)
+        with cache_path.open("rb") as handle:
+            cached = pickle.load(handle)
+        if isinstance(cached, FeatureSelection) and len(cached.pdb_name) > 0:
+            return cached
+        LOGGER.warning("Cached FeatureSelection invalid; rebuilding from prefix %s", prefix)
+
+    LOGGER.info("Building FeatureSelection from prefix %s", prefix)
     fs = FeatureSelection(prefix, ref_pdb=ref)
     fs.apply_filter(fs.steric_clash_filter(steric_clash_cutoff))
+    try:
+        with cache_path.open("wb") as handle:
+            pickle.dump(fs, handle)
+        LOGGER.debug("FeatureSelection cached to %s", cache_path)
+    except OSError as exc:
+        LOGGER.warning("Unable to write FeatureSelection cache %s: %s", cache_path, exc)
     return fs
 
 
@@ -68,7 +100,7 @@ def _find_chains(fs: FeatureSelection, letters: Sequence[str]):
         chain_id = None
         for c in top.chains:
             if c.chain_id == l:
-                chain_id = c.chain_id
+                chain_id = c.index
                 break
         if chain_id is None:
             raise ValueError(f"Chain ID {l} not found in topology.")
@@ -138,8 +170,8 @@ def _select_features(
         output_dir: str | None = None
     ) -> list[str]:
 
-    
-    names, cv = fs.rank_feature(*selection)
+    LOGGER.debug(selection)
+    names, cv = fs.rank_feature(selection)
 
     if output_dir:
 
@@ -172,7 +204,6 @@ def _filter_by_qval(
     filter = [pdb_names[i] for i in valid_id]
     fs.apply_filter(filter)
     return qval[valid_id]
-
 
 def _cluster(
         fs: FeatureSelection,
@@ -217,7 +248,7 @@ def _cluster(
                     "facecolor": "None", 
                     "linewidth": 0.5}
         ax.scatter(pca_cc[:,0], pca_cc[:,1], **cc_kwargs)
-        for c in center_id[::3]:
+        for c in center_id:
             ax.text(pca_result[c,0], pca_result[c,1], fs.pdb_name[c].split("/")[-1], fontsize=3)
         ax.set_xlabel("PC1")
         ax.set_ylabel("PC2")
@@ -235,6 +266,7 @@ def _run_pca_in_subspace(
 
     # Extract time series data from features
     z = np.array([fs.features[fn] for fn in feature_names], dtype=np.float64).T
+    LOGGER.debug("Feature data shape before PCA: %s", z.shape)
 
     # Ensure there are enough features to compute the requested components
     if z.shape[1] < n_components:
@@ -284,3 +316,4 @@ def _box_structures(
         np.save(f"{output_dir}/index.npy", new_index)
 
         box.save_pdb(f"{output_dir}/{prefix}")
+        LOGGER.info(f"Wrote boxed structure {prefix}")

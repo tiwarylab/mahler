@@ -46,7 +46,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.command is None:
         parser.print_help()
         return 0
-    logging.basicConfig(level=logging.DEBUG if args.debug else logging.WARNING)
+    # Keep third-party loggers quiet and only elevate tempo's logger when debugging.
+    logging.basicConfig(level=logging.WARNING)
+    tempo_logger = logging.getLogger("tempo")
+    tempo_logger.setLevel(logging.DEBUG if args.debug else logging.INFO)
     return dispatch(args)
 
 
