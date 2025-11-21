@@ -1,6 +1,8 @@
 import mdtraj as md
 import numpy as np
 
+import logging
+LOGGER = logging.getLogger(__name__)
 
 class NativeContact:
 
@@ -32,7 +34,7 @@ class NativeContact:
         self._native = reference
         self._top: md.Topology = reference.topology
 
-        print(selection[0], selection[1])
+        LOGGER.debug(f"Computing native contacts for {selection[0]} and {selection[1]}")
         pairs = self._top.select_pairs(selection[0], selection[1])
         dist = md.compute_distances(self._native, pairs, periodic=False)[0]
 
