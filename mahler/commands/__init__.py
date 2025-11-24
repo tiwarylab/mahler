@@ -9,6 +9,7 @@ from .info import InfoCommand
 from .rave import RaveCommand
 from .reweight import ReweightCommand
 from .mdprep import MDPrepCommand
+from .mdrun import MDRunCommand
 
 
 def available_commands() -> list[Command]:
@@ -20,6 +21,7 @@ def available_commands() -> list[Command]:
         IfMetadCommand,
         ReweightCommand,
         MDPrepCommand,
+        MDRunCommand,
     ]
     return commands
 

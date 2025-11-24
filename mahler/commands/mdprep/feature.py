@@ -14,7 +14,7 @@ import pickle
 
 from mahler.utils.contact import NativeContact
 
-LOGGER = logging.getLogger(__name__)
+LOGGER = logging.getLogger("mahler.mdprep")
 
 
 def execute(

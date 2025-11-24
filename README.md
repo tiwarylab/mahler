@@ -30,3 +30,4 @@ The scaffold ships with the following example commands:
 - `mahler ifmetad` represents infrequent metadynamics workflows.
 - `mahler reweight` will reweight collected trajectories.
 - `mahler mdprep` will cluster MD trajectories via `--n_clusters` and optionally align to a reference PDB via `--reference`.
+- `mahler mdrun` will run MD production trajectories using inputs such as `--pdb`, `--index`, and outputs `--colvar`, `--traj`, `--log`.
