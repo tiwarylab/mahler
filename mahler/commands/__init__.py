@@ -11,7 +11,6 @@ from .reweight import ReweightCommand
 from .mdprep import MDPrepCommand
 from .mdrun import MDRunCommand
 
-
 def available_commands() -> list[Command]:
     """Return all command classes to register with argparse."""
     commands: list[Command] = [

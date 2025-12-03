@@ -18,7 +18,9 @@ license = { file = "LICENSE" }
 dependencies = [
   "af2rave @ git+https://github.com/tiwarylab/af2rave.git",
   "matplotlib",
-  "colvar-toolkit"
+  "colvar-toolkit",
+  "tqdm",
+  "tables"
 ]
 keywords = ["cli"]
 
