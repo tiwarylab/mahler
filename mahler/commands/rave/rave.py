@@ -1,8 +1,10 @@
 from af2rave.amino import AMINO
 from af2rave.spib import SPIBProcess
+from mahler.utils.os import file_exists
 
 from os import PathLike
 from pathlib import Path
+import numpy as np
 import json
 
 import logging
@@ -12,6 +14,8 @@ LOGGER = logging.getLogger("mahler.rave")
 def execute(
         file_path: PathLike[str], 
         output_path: PathLike[str],
+        ag_chains: list[str],
+        ab_chains: list[str],
         max_colvar: int = 30,
         topology: PathLike[str] | None = None,
         suffix: str = "dat"
@@ -30,8 +34,9 @@ def execute(
     output_path = Path(output_path)
     output_path.mkdir(parents=True, exist_ok=True)
 
-    if all((_get_output_filename(c, output_path, suffix)).exists() for c in colvar_files):
-        LOGGER.info("All selected colvar files already exist. Skipping AMINO selection.")
+    all_outputs_exist = all(file_exists(_get_output_filename(c, output_path, suffix)) for c in colvar_files)
+    if all_outputs_exist and file_exists(output_path / "index.npy"):
+        LOGGER.info("Looks like AMINO has been finished. Skipping AMINO selection.")
     else:
         if not (output_path / "amino_result.json").exists():
             LOGGER.info("Running AMINO to select important CVs.")
@@ -46,8 +51,9 @@ def execute(
             for c in colvar_files:
                 _select(c, output_path, result)
 
-    if topology is not None:
-        _parse_result(topology, result)
+    _parse_result(topology, result)
+    index = _parse_index_from_result(result)
+    np.save(output_path / "index.npy", index)
 
     # SPIB
     if (output_path / "spib_model.pkl").exists():
@@ -60,8 +66,27 @@ def execute(
         result = spib.run(time_lag=100, lr_scheduler_gamma=0.9)
         result.to_file(str(output_path / "spib_model.pkl"))
 
+    from .plumed import print_plumed
+    print_plumed(
+        input_file=topology,
+        ag_chains=ag_chains,
+        ab_chains=ab_chains,
+        spib_model=output_path / "spib_model.pkl",
+        index_file=output_path / "index.npy",
+        out=output_path / "plumed.dat"
+    )
+
     return 0
 
+
+def _parse_index_from_result(result) -> np.ndarray:
+    """Parse AMINO result to obtain selected residue indices."""
+    indices = list()
+    for r in result:
+        _, i, j = r.split('_')
+        indices += [(int(i), int(j))]
+    indices = np.array(indices, dtype=int)
+    return indices
 
 def _do_amino(
         colvar_files: list[PathLike[str]],

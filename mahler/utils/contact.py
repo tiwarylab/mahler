@@ -33,6 +33,7 @@ class NativeContact:
         
         self._native = reference
         self._top: md.Topology = reference.topology
+        self._selection = selection
 
         LOGGER.debug(f"Computing native contacts for {selection[0]} and {selection[1]}")
         pairs = self._top.select_pairs(selection[0], selection[1])
@@ -49,25 +50,71 @@ class NativeContact:
     
     @property
     def contacts_atoms(self) -> np.ndarray:
-        """Return the sorted, unique atom indices involved in native contacts."""
+        """Return the sorted, unique atom indices (0-based) involved in native contacts."""
         # Flatten once and use np.unique for deterministic ordering
         return np.unique(self.contacts)
     
     @property
     def contacts_residues(self) -> dict[str, list[int]]:
-        """Return residue indices per chain that participate in native contacts."""
+        """Return residue indices (0-based) per chain that participate in native contacts."""
         residues: dict[str, list[int]] = {}
         for atom_index in self.contacts_atoms:
             residue = self._top.atom(int(atom_index)).residue
             chain = residue.chain.chain_id
             if chain is None:
-                raise RuntimeError(f"Residue {residue} has no chain.")
+                raise RuntimeError(f"Residue {residue} has no chain designation.")
             residues.setdefault(chain, []).append(residue.index)
 
         # Remove duplicates per chain and keep indices sorted for determinism
         for chain, residue_list in residues.items():
             residues[chain] = sorted(set(residue_list))
         return residues
+    
+    @property
+    def contacts_ca(self) -> dict[str, list[int]]:
+        """Return CA atom indices (0-based) per chain represented in native contacts."""
+
+        # Use sets for O(1) membership when checking which residues contribute to contacts
+        residues_by_chain = {
+            chain: set(residue_indices) for chain, residue_indices in self.contacts_residues.items()
+        }
+        ca_per_chain: dict[str, list[int]] = {}
+
+        for atom_index in self._top.select("name CA"):
+            atom = self._top.atom(int(atom_index))
+            residue = atom.residue
+            chain = residue.chain.chain_id
+
+            if chain in residues_by_chain and residue.index in residues_by_chain[chain]:
+                ca_per_chain.setdefault(chain, []).append(int(atom_index))
+
+        for chain, indices in ca_per_chain.items():
+            ca_per_chain[chain] = sorted(indices)
+
+        return ca_per_chain
+    
+
+    @property
+    def ref_ifd(self) -> np.ndarray:
+        """Return the inter-group distance (IFD) in the reference structure."""
+        return self.compute_ifd(self._native)
+
+    def compute_ifd(self, traj: md.Trajectory) -> np.ndarray:
+
+        # all the CA atoms involving in contacts
+        ca_idx = []
+        for chain in self.contacts_ca.values():
+            ca_idx += chain
+        
+        # intersect with selection
+        ca_idx_sel0 = sorted(list(traj.top.select(self._selection[0])).intersection(ca_idx))
+        ca_idx_sel1 = sorted(list(traj.top.select(self._selection[1])).intersection(ca_idx))
+
+        # compute distances
+        ag_com = np.array(traj.xyz[:, ca_idx_sel0, :].mean(axis=1))
+        ab_com = np.array(traj.xyz[:, ca_idx_sel1, :].mean(axis=1))
+        new_dist = np.linalg.norm(ag_com - ab_com, axis=1) * 10  # Convert to Angstroms
+        return new_dist
 
     def compute(self, traj: md.Trajectory, lamda: float = 1.8, beta: float = 50) -> np.ndarray:
         '''

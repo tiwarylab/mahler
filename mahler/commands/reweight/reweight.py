@@ -15,6 +15,7 @@ from cvtoolkit import Colvar
 from mahler.proteinmpnn import ScoreMPNN
 from mahler.utils.fasta import parse_fasta
 from mahler.utils.poisson import bootstrap, fit_poisson
+from mahler.utils.topology import check_chains
 
 __all__ = ["execute", "score_sequence", "reweighted_time"]
 
@@ -164,7 +165,7 @@ def score_sequence(
 
     scorer = ScoreMPNN()
     scores: list[np.ndarray] = []
-    chains = _check_chains(traj)
+    chains = check_chains(traj)
     with tqdm.tqdm(total=len(traj), desc="Scoring frames") as progress:
         for start in range(0, len(traj), frames_per_batch):
             end = min(start + frames_per_batch, len(traj))
@@ -186,31 +187,6 @@ def score_sequence(
     result -= result[:, [0]]
     return result
 
-def _check_chains(traj: md.Trajectory) -> str:
-    """Check the chains existing in the trajectory and fix problems."""
-    top: md.Topology = traj.topology
-    idx_protein = top.select("protein")
-
-    top_pro = top.subset(idx_protein)
-    pro_chain_ids = [chain.chain_id.strip() for chain in top_pro.chains]
-    if "" not in pro_chain_ids:             # we are good to go
-        chains = " ".join(pro_chain_ids)
-        LOGGER.info(f"Protein chains found: {chains}")
-        return chains
-
-    pro_chain_ids = []
-    LOGGER.warning("Some protein chains have no chain IDs. Renaming them...")
-    for i, c in enumerate(top.chains):
-        # check if this chain is a protein chain
-        atom_indices = [atom.index for atom in c.atoms]
-        if all(idx in idx_protein for idx in atom_indices):
-            c.chain_id = chr(ord('A') + i)
-            pro_chain_ids.append(c.chain_id)
-            LOGGER.info(f"Renaming protein chain {c.index} to '{c.chain_id}'.")
-        else:
-            LOGGER.info(f"Skipping non-protein chain {c.index}.")
-    return " ".join(pro_chain_ids)
-    
 
 def reweighted_time(
     sequences: Sequence[str],

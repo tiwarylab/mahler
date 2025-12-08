@@ -68,3 +68,25 @@ def test_contacts_residues_property_groups_atoms_by_chain(native_contact: Native
 
     expected_sorted = {chain: sorted(indices) for chain, indices in expected.items()}
     assert residues == expected_sorted
+
+
+def test_contacts_ca_property_returns_sorted_numpy_arrays(native_contact: NativeContact, example_traj: md.Trajectory) -> None:
+    ca_map = native_contact.contacts_ca
+    assert set(ca_map) == {"A", "B", "C"}
+
+    for chain, indices in ca_map.items():
+        assert isinstance(indices, list)
+        assert all(isinstance(idx, int) for idx in indices)
+        assert all(indices[i] <= indices[i + 1] for i in range(len(indices) - 1))
+
+    # Validate against residues participating in native contacts
+    expected: dict[str, list[int]] = {chain: [] for chain in native_contact.contacts_residues}
+    for chain, residue_indices in native_contact.contacts_residues.items():
+        for residue_idx in residue_indices:
+            residue = example_traj.topology.residue(residue_idx)
+            ca_atom = next((atom.index for atom in residue.atoms if atom.name == "CA"), None)
+            if ca_atom is not None:
+                expected[chain].append(ca_atom)
+
+    expected_sorted = {chain: sorted(indices) for chain, indices in expected.items()}
+    assert ca_map == expected_sorted
