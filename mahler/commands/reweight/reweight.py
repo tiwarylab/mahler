@@ -16,6 +16,7 @@ from mahler.proteinmpnn import ScoreMPNN
 from mahler.utils.fasta import parse_fasta
 from mahler.utils.poisson import bootstrap, fit_poisson
 from mahler.utils.topology import check_chains
+from mahler.utils.os import list_files
 
 __all__ = ["execute", "score_sequence", "reweighted_time"]
 
@@ -31,6 +32,7 @@ def execute(
     output_directory: Pathish,
     score_directory: Pathish | None = None,
     n_bootstrap: int = 1000,
+    topology_file: Pathish | None = None,
 ) -> int:
     """Run the reweighting pipeline for every trajectory/colvar pair."""
 
@@ -44,7 +46,6 @@ def execute(
     if score_directory is not None:
         score_path = Path(score_directory)
         score_path.mkdir(parents=True, exist_ok=True)
-    
 
     sequence_dict = parse_fasta(sequence_fasta)
     sequences = list(sequence_dict.values())
@@ -67,6 +68,7 @@ def execute(
             cache=cache,
             stride=500,
             frames_per_batch=10,
+            topology_file=topology_file,
         )
         all_times.append(time)
         all_rw_times.append(rw_time)
@@ -118,11 +120,12 @@ def _map_files(
     if not colvar_directory.is_dir():
         raise FileNotFoundError(f"Colvar directory {colvar_directory} does not exist or is not a directory.")
 
-    traj_files = sorted(traj_directory.glob("*"))
+    traj_files = list_files(traj_directory)
+    print(traj_files)
     files_mapping: dict[Path, Path] = {}
     for tf in traj_files:
         prefix = tf.stem
-        cf = list(colvar_directory.glob(f"{prefix}*"))
+        cf = list(colvar_directory.glob(f"{prefix}.*"))
         if len(cf) != 1:
             raise ValueError(f"Cannot find exactly one colvar file for trajectory file {tf}.")
         else:
@@ -144,6 +147,7 @@ def score_sequence(
     cache: Pathish | None = None,
     decoding_order: Sequence[str] | None = None,
     frames_per_batch: int = 1,
+    topology_file: Pathish | None = None,
 ) -> np.ndarray:
     """Score every trajectory frame against the provided sequences."""
 
@@ -151,7 +155,11 @@ def score_sequence(
         msg = f"frames_per_batch must be positive, received {frames_per_batch}."
         raise ValueError(msg)
 
-    traj: md.Trajectory = md.load(str(traj_file))
+    try:
+        traj: md.Trajectory = md.load(str(traj_file), top=topology_file)
+    except Exception as e:
+        msg = f"Failed to load trajectory file {traj_file} with topology {topology_file}: {e}"
+        raise RuntimeError(msg) from e
 
     if cache is not None:
         # check if cache exists and is non-empty
@@ -196,6 +204,7 @@ def reweighted_time(
     stride: int = 500,
     decoding_order: Sequence[str] | None = None,
     frames_per_batch: int = 1,
+    topology_file: Pathish | None = None,
 ) -> tuple[float, np.ndarray]:
     """Return WT and per-sequence reweighted times for a trajectory."""
     if stride <= 0:
@@ -214,6 +223,7 @@ def reweighted_time(
         cache=cache,
         decoding_order=decoding_order,
         frames_per_batch=frames_per_batch,
+        topology_file=topology_file,
     )
 
     buffed_result = np.repeat(result, stride, axis=0)

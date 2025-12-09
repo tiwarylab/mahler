@@ -50,6 +50,12 @@ class ReweightCommand:
             required=False,
             help="Directory where score cache files will be read/written. If none is provided, defaults to the output directory.",
         )
+        parser.add_argument(
+            "--topology",
+            "-s",
+            required=False,
+            help="Topology file for the trajectories (if needed).",   
+        )
 
     @staticmethod
     def run(args: argparse.Namespace) -> int:
@@ -64,5 +70,6 @@ class ReweightCommand:
             sequence_fasta=args.fasta,
             score_directory=cache_directory,
             output_directory=args.output,
-            n_bootstrap=args.bootstrap
+            n_bootstrap=args.bootstrap,
+            topology_file=args.topology,
         )
