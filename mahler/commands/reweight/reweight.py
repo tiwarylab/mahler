@@ -9,7 +9,11 @@ import logging
 
 import mdtraj as md
 import numpy as np
+from tqdm import TqdmExperimentalWarning
 import tqdm.rich as tqdm
+import warnings
+warnings.filterwarnings("ignore", category=TqdmExperimentalWarning)
+
 from cvtoolkit import Colvar
 
 from mahler.proteinmpnn import ScoreMPNN
@@ -121,7 +125,6 @@ def _map_files(
         raise FileNotFoundError(f"Colvar directory {colvar_directory} does not exist or is not a directory.")
 
     traj_files = list_files(traj_directory)
-    print(traj_files)
     files_mapping: dict[Path, Path] = {}
     for tf in traj_files:
         prefix = tf.stem

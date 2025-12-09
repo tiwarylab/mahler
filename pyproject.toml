@@ -33,3 +33,9 @@ mahler = "mahler.cli:main"
 
 [tool.setuptools.packages.find]
 include = ["mahler*"]
+
+[tool.setuptools.package-data]
+"mahler" = [
+  "proteinmpnn/ca_model_weights/**/*",
+  "proteinmpnn/vanilla_model_weights/**/*"
+]
