@@ -13,7 +13,7 @@ authors = [
 maintainers = [
   { name = "Tiwary Lab" }
 ]
-requires-python = ">=3.11"
+requires-python = ">=3.10"
 license = { file = "LICENSE" }
 dependencies = [
   "af2rave @ git+https://github.com/tiwarylab/af2rave.git",

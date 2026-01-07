@@ -8,12 +8,6 @@ MAHLER (Metadynamics-Anchored Hybrid Learning for Engineering off-Rates) provide
 pip install .
 ```
 
-During development you can use an editable install instead:
-
-```bash
-pip install -e .
-```
-
 ## Usage
 
 After installation the `mahler` CLI becomes available on your `$PATH`.
@@ -29,7 +23,6 @@ The package ships with the following example commands:
 - `mahler mdprep` will cluster folded stuctures and create MD setups.
 - `mahler mdrun` will run short MD for representation learning with RAVE.
 - `mahler rave` will run the RAVE protocol and acquire a latent space.
-- `mahler ifmetad` infrequent metadynamics workflows.
 - `mahler reweight` will reweight collected trajectories.
 
 
