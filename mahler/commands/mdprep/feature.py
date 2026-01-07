@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 import logging
 from pathlib import Path
+from os import PathLike
 
 from af2rave.feature import FeatureSelection
 from af2rave.simulation import SimulationBox
@@ -10,20 +11,23 @@ import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.decomposition import PCA
 from sklearn.cluster import KMeans
+import openmm.app as app
 import pickle
 
 from mahler.utils.contact import NativeContact
+from mahler.utils.os import file_exists
+from .reference import generate_reference
 
 LOGGER = logging.getLogger("mahler.mdprep")
 
 
 def execute(
-        prefix: str,
-        output_dir: str,
-        ref: str | None = None,
+        prefix: PathLike,
+        output_dir: PathLike,
+        ref: PathLike | None = None,
         steric_clash_cutoff: float = 1.0,
         ag_chains: Sequence[str] = ("A",),
-        ab_chains: Sequence[str] = ("B", "C"),
+        ab_chains: Sequence[str] = ("B", "C",),
         include_cb: bool = True,
         n_features: int = 200,
         n_clusters: int = 15,
@@ -32,13 +36,23 @@ def execute(
 ):
     LOGGER.info("Starting mdprep workflow for prefix '%s'", prefix)
 
+    prefix = Path(prefix)
+    output_dir = Path(output_dir)
     if prefix == output_dir:
         raise ValueError("Input and output directories cannot be the same.")
-    output_dir_path = Path(output_dir)
-    output_dir_path.mkdir(parents=True, exist_ok=True)
+    output_dir.mkdir(parents=True, exist_ok=True)
 
-    fs = _load(prefix, ref, steric_clash_cutoff)
-    LOGGER.debug("Loaded feature selection with %d structures", len(fs.pdb_name))
+    # Match topology between reference and AF2 PDB
+    # tricky thing: if no experimental reference is provided, do not infer sulfide bonds
+    disulfide_bond = None
+    if ref is not None:
+        af2_pdb = next(prefix.glob("*.pdb"))
+        new_ref = output_dir / "reference_af2index.pdb"
+        disulfide_bond = generate_reference(ref, af2_pdb, new_ref)
+        ref = new_ref
+
+    LOGGER.info("Reference PDB at %s", ref)
+    fs = _load(prefix, output_dir, ref, steric_clash_cutoff)
 
     # Find chain_id (0-based) from one-letter chain names in PDB
     antigen_chains = _find_chains(fs, ag_chains)
@@ -56,7 +70,7 @@ def execute(
     LOGGER.info("Selected top %d features", len(feature_names))
 
     # remove structures with q-val too low
-    qval = _filter_by_qval(fs, nc, qval_cutoff)
+    qval = _filter_by_qval(fs, nc, qval_cutoff, output_dir)
     LOGGER.info("Filtered structures; %d remain above qval %.2f", len(qval), qval_cutoff)
 
     # cluster into centers
@@ -65,32 +79,52 @@ def execute(
     LOGGER.info("Identified %d cluster centers", len(center_id))
 
     # Save PDBs
-    _box_structures(fs, feature_names, center_id, output_dir)
+    _box_structures(fs, feature_names, center_id, output_dir, disulfide_bond=disulfide_bond)
     LOGGER.info("Boxed structures written to %s", output_dir)
 
     
-def _load(prefix: str, ref: str | None = None, steric_clash_cutoff: float = 1.0) -> FeatureSelection:
+def _load(
+        prefix: PathLike,
+        output_dir: PathLike,
+        ref: PathLike | None = None, 
+        steric_clash_cutoff: float = 1.0
+) -> FeatureSelection:
     """Return a FeatureSelection, loading/saving a cache to avoid reprocessing."""
-    cache_path = Path(prefix, "feature_selection.pkl")
-    if cache_path.exists():
-        LOGGER.debug("Loading FeatureSelection cache from %s", cache_path)
-        with cache_path.open("rb") as handle:
-            cached = pickle.load(handle)
-        if isinstance(cached, FeatureSelection) and len(cached.pdb_name) > 0:
-            return cached
-        LOGGER.warning("Cached FeatureSelection invalid; rebuilding from prefix %s", prefix)
 
-    LOGGER.info("Building FeatureSelection from prefix %s", prefix)
-    fs = FeatureSelection(prefix, ref_pdb=ref)
+    cache_path = output_dir / "feature_selection.pkl"
+    fs = _load_fs_cache(cache_path)
+    if fs is None:
+        LOGGER.info("Building FeatureSelection from prefix %s", prefix)
+        ref_pdb = str(ref) if ref else None
+        fs = FeatureSelection(str(prefix), ref_pdb=ref_pdb)
+        _dump_fs_cache(fs, cache_path)
+
+    LOGGER.info(f"Loaded {len(fs.pdb_name)} structures from FeatureSelection.")
     fs.apply_filter(fs.steric_clash_filter(steric_clash_cutoff))
+    LOGGER.info(f"{len(fs.pdb_name)} structures remain after steric clash cutoff {steric_clash_cutoff} Angstrom.")
+    return fs
+
+def _dump_fs_cache(fs: FeatureSelection, cache_path: Path):
+    """Dump FeatureSelection to cache file."""
     try:
         with cache_path.open("wb") as handle:
             pickle.dump(fs, handle)
         LOGGER.debug("FeatureSelection cached to %s", cache_path)
     except OSError as exc:
         LOGGER.warning("Unable to write FeatureSelection cache %s: %s", cache_path, exc)
-    return fs
 
+def _load_fs_cache(cache_path: Path) -> FeatureSelection | None:
+    """Load FeatureSelection from cache file, if it exists and is valid."""
+    if file_exists(cache_path):
+        LOGGER.debug("Loading FeatureSelection cache from %s", cache_path)
+        with cache_path.open("rb") as handle:
+            cached = pickle.load(handle)
+        if isinstance(cached, FeatureSelection) and len(cached.pdb_name) > 0:
+            return cached
+        else:
+            return None
+    else:
+        return None
 
 def _find_chains(fs: FeatureSelection, letters: Sequence[str]):
 
@@ -187,7 +221,7 @@ def _select_features(
         ax.set_ylabel("Density")
         ax.set_xlim(0, 0.5)
         ax.legend()
-        fig.savefig(output_dir + "/feature_selection.png")
+        fig.savefig(output_dir / "feature_selection.png")
 
     return names[:n_features]
 
@@ -196,12 +230,25 @@ def _filter_by_qval(
         fs: FeatureSelection,
         nc: NativeContact,
         qval_cutoff: float = 0.85,
+        output_dir: PathLike | None = None,
 ) -> list[str]:
 
     pdb_names = fs.pdb_name
     qval = nc.compute(fs.traj)
     valid_id = [i for i, q in enumerate(qval) if q > qval_cutoff]
     filter = [pdb_names[i] for i in valid_id]
+    LOGGER.info(f"Filtering structures by Q-val > {qval_cutoff}: {len(pdb_names)} -> {len(filter)}")
+
+    if output_dir:
+
+        fig, ax = plt.subplots(figsize=(3, 2), constrained_layout=True, dpi=300)
+        ifd = nc.compute_ifd(fs.traj)
+        ax.scatter(qval, ifd, s=3, edgecolors="none")
+        ax.set_xlabel("Q-value")
+        ax.set_ylabel("Interface residues distance")
+        ax.axvline(qval_cutoff, color="red", linestyle="--", linewidth=1)
+        fig.savefig(output_dir / "qval_filtering.png")
+
     fs.apply_filter(filter)
     return qval[valid_id]
 
@@ -211,7 +258,7 @@ def _cluster(
         n_clusters: int = 15,
         dimensions: int = 8,
         random_seed: int = 42,
-        output_dir: str | None = None,
+        output_dir: PathLike | None = None,
         **plot_kwargs
 ):
     '''
@@ -223,7 +270,7 @@ def _cluster(
     center_id = _get_pca_centroids(pca_result, n_clusters, random_seed)
 
     if output_dir:
-        fig, ax = plt.subplots(figsize=(4,3), dpi=300)
+        fig, ax = plt.subplots(figsize=(4,3), dpi=300, constrained_layout=True)
         ax.set_box_aspect(1)
 
         scatter_kwargs = {"s": 3, 
@@ -231,7 +278,6 @@ def _cluster(
                          "cmap": "gnuplot", 
                          "norm": "linear", 
                          "edgecolors": "none",
-                         "vmin": 0
                          }
 
         cbar = ax.scatter(pca_result[:,0], pca_result[:,1], **scatter_kwargs)
@@ -252,7 +298,7 @@ def _cluster(
             ax.text(pca_result[c,0], pca_result[c,1], fs.pdb_name[c].split("/")[-1], fontsize=3)
         ax.set_xlabel("PC1")
         ax.set_ylabel("PC2")
-        fig.savefig(output_dir + "/pca_cluster.png")
+        fig.savefig(output_dir / "pca_cluster.png")
 
     return center_id
 
@@ -300,17 +346,20 @@ def _box_structures(
         fs: FeatureSelection,
         feature_names: Sequence[str],
         center_id: Sequence[int],
-        output_dir: str
+        output_dir: str,
+        disulfide_bond: np.ndarray | None = None,
 ):
 
     pdb_names = [fs.pdb_name[i] for i in center_id]
     atom_index = [fs.atom_pairs[n] for n in feature_names]
 
-    for p in pdb_names:
-
+    for p in [fs.ref_pdb] + pdb_names:
         prefix = p.split("/")[-1]
-        
-        box = SimulationBox(p)
+        box = SimulationBox(p, 
+            app.ForceField("amber14/protein.ff14SB.xml", "amber14/tip3p.xml")
+        )
+        if disulfide_bond is not None:
+            box.add_disulfide_bond(disulfide_bond)
         box.create_box()
         new_index = box.map_atom_index(atom_index)
         np.save(f"{output_dir}/index.npy", new_index)

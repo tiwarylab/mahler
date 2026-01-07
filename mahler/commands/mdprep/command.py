@@ -19,14 +19,21 @@ class MDPrepCommand:
         parser.description = (
             "Cluster MD-ready structures and create feature selections from a reference trajectory."
         )
-        parser.add_argument("--prefix", required=True, help="Path to structures or trajectory.")
+        parser.add_argument(
+            "--structure_prefix",
+            "-s", 
+            required=True, 
+            help="Path to structures or trajectory."
+        )
         parser.add_argument(
             "--output_dir",
+            "-o",
             required=True,
             help="Directory to write feature selection artifacts and clustering output.",
         )
         parser.add_argument(
             "--ref",
+            "-r",
             default=None,
             help="Reference PDB used for contact detection (defaults to first frame).",
         )
@@ -38,12 +45,14 @@ class MDPrepCommand:
         )
         parser.add_argument(
             "--antigen_chains",
+            "-ag",
             default="A",
             metavar="CHAINS",
             help="Comma-separated chain IDs treated as antigen (letters).",
         )
         parser.add_argument(
             "--antibody_chains",
+            "-ab",
             default="B,C",
             metavar="CHAINS",
             help="Comma-separated chain IDs treated as antibody (letters).",
@@ -97,7 +106,7 @@ class MDPrepCommand:
             return tuple(part.strip() for part in value.split(",") if part.strip())
 
         execute(
-            prefix=args.prefix,
+            prefix=args.structure_prefix,
             output_dir=args.output_dir,
             ref=args.ref,
             steric_clash_cutoff=args.steric_clash_cutoff,
