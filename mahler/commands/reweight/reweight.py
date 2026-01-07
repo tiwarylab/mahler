@@ -148,7 +148,7 @@ def score_sequence(
     sequences: Sequence[str],
     traj_file: Pathish,
     cache: Pathish | None = None,
-    decoding_order: Sequence[str] | None = None,
+    decoding_order: np.array | None = None,
     frames_per_batch: int = 1,
     topology_file: Pathish | None = None,
 ) -> np.ndarray:
@@ -169,7 +169,6 @@ def score_sequence(
         if Path(cache).is_file() and Path(cache).stat().st_size > 0:
             result = np.load(str(cache), allow_pickle=False)
             LOGGER.info(f"Loaded scores from cache file {cache}.")
-            result -= result[:, [0]]
             return result
         else:
             LOGGER.warning(f"Cache file {cache} does not exist or is empty. Proceeding to score trajectory.")
@@ -177,7 +176,8 @@ def score_sequence(
     scorer = ScoreMPNN()
     scores: list[np.ndarray] = []
     chains = check_chains(traj)
-    with tqdm.tqdm(total=len(traj), desc="Scoring frames") as progress:
+    name = Path(traj_file).name
+    with tqdm.tqdm(total=len(traj), desc=f"Scoring {name}") as progress:
         for start in range(0, len(traj), frames_per_batch):
             end = min(start + frames_per_batch, len(traj))
             chunk = traj.slice(slice(start, end), copy=False)
@@ -195,7 +195,6 @@ def score_sequence(
         LOGGER.info(f"Saved scores to cache file {cache}.")
 
     # Normalize with respect to the first sequence for each frame.
-    result -= result[:, [0]]
     return result
 
 
@@ -205,6 +204,7 @@ def reweighted_time(
     colvar_file: Pathish,
     cache: Pathish | None = None,
     stride: int = 500,
+    temperature: float = 310.0,
     decoding_order: Sequence[str] | None = None,
     frames_per_batch: int = 1,
     topology_file: Pathish | None = None,
@@ -217,7 +217,7 @@ def reweighted_time(
     colvar = Colvar.from_file(str(colvar_file))
     dt = float(colvar.time[1] - colvar.time[0])
 
-    beta = 1.0 / (1.987204259e-3 * 310)  # kcal/mol/K
+    beta = 1.0 / (1.987204259e-3 * temperature)  # kcal/mol/K
     acc = np.exp(beta * colvar["metad.bias"])
 
     result = score_sequence(
