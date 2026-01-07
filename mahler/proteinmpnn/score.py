@@ -59,7 +59,6 @@ class ScoreMPNN:
                     chain_encoding_all, sequence=None, num_batches=1,
                     decoding_order=None):
 
-        global_scores = []
         alphabet_dict = dict(zip('ACDEFGHIKLMNPQRSTVWYX', range(21))) 
         
         # If FASTA sequence provided, update the input sequence tensor
@@ -69,33 +68,28 @@ class ScoreMPNN:
                 [alphabet_dict[AA] for AA in seq], 
                 device=self.device
             )[None,:].repeat(X.shape[0], 1)
-        
-        # Score sequences in batches
-        for _ in range(num_batches):
 
-            randn = torch.randn(chain_M.shape, device=X.device)
-            log_probs = self.model(X, S, mask, chain_M*chain_M_pos, residue_idx, 
-                                   chain_encoding_all, randn,
-                                   decoding_order=decoding_order)
+        randn = torch.randn(chain_M.shape, device=X.device)
+        log_probs = self.model(X, S, mask, chain_M*chain_M_pos, residue_idx, 
+                                chain_encoding_all, randn,
+                                decoding_order=decoding_order)
 
-            # Calculate scores
-            criterion = torch.nn.NLLLoss(reduction='none')
-            loss = criterion(
-                log_probs.contiguous().view(-1, log_probs.size(-1)),
-                S.contiguous().view(-1)
-            ).view(S.size())
-            global_score = torch.sum(loss * mask, dim=-1) / torch.sum(mask, dim=-1)
-            global_scores.append(global_score.cpu().numpy())
+        # Calculate scores
+        criterion = torch.nn.NLLLoss(reduction='none')
+        loss = criterion(
+            log_probs.contiguous().view(-1, log_probs.size(-1)),
+            S.contiguous().view(-1)
+        ).view(S.size())
+        global_score = torch.sum(loss * mask, dim=-1) / torch.sum(mask, dim=-1)
+        global_score = global_score.cpu().numpy()
 
-        score = np.array(global_scores)
-        return score.mean(axis=0)
+        return global_score
 
     
     def score(self,
             sequence: str | list[str] | None,
             structure: str | md.Trajectory,
             chains: str,
-            num_seq_per_target: int = 1,
             relative: bool = True,
             decoding_order = None
         ) -> np.ndarray:
@@ -120,7 +114,6 @@ class ScoreMPNN:
                 pdb_score = self._score_sequence(
                     X, S, mask, chain_M, chain_M_pos, residue_idx, 
                     chain_encoding_all, sequence=None, 
-                    num_batches=num_seq_per_target,
                     decoding_order=decoding_order
                 )
                 pdb_score = pdb_score[:, None]
@@ -131,7 +124,6 @@ class ScoreMPNN:
                 pdb_score = self._score_sequence(
                     X, S, mask, chain_M, chain_M_pos, residue_idx, 
                     chain_encoding_all, sequence=None, 
-                    num_batches=num_seq_per_target,
                     decoding_order=decoding_order
                 )
                 pdb_score = pdb_score[:, None]
@@ -145,7 +137,6 @@ class ScoreMPNN:
                 self._score_sequence(
                     X, S, mask, chain_M, chain_M_pos, residue_idx,
                     chain_encoding_all, sequence=seq,
-                    num_batches=num_seq_per_target,
                     decoding_order=decoding_order
                 ) for seq in sequence
             ]).T
