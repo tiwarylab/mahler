@@ -107,8 +107,8 @@ class NativeContact:
             ca_idx += chain
         
         # intersect with selection
-        ca_idx_sel0 = sorted(list(traj.top.select(self._selection[0])).intersection(ca_idx))
-        ca_idx_sel1 = sorted(list(traj.top.select(self._selection[1])).intersection(ca_idx))
+        ca_idx_sel0 = sorted(list(set(traj.top.select(self._selection[0])).intersection(ca_idx)))
+        ca_idx_sel1 = sorted(list(set(traj.top.select(self._selection[1])).intersection(ca_idx)))
 
         # compute distances
         ag_com = np.array(traj.xyz[:, ca_idx_sel0, :].mean(axis=1))
