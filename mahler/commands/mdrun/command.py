@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import numpy as np
+from pathlib import Path
 
 class MDRunCommand:
     """Stub for running MD production trajectories."""
@@ -15,24 +16,28 @@ class MDRunCommand:
     def configure_parser(parser: argparse.ArgumentParser) -> None:
         parser.add_argument(
             "--pdb",
+            "-i",
             required=True,
             metavar="PDB",
             help="One or more PDB files describing prepared structures.",
         )
         parser.add_argument(
             "--index",
+            "-n",
             metavar="INDEX",
             default=None,
             help="Path to the NumPy index (.npy) file used for selections.",
         )
         parser.add_argument(
             "--colvar",
+            "-c",
             metavar="COLVAR",
             default=None,
             help="Output file path for the generated COLVAR data. Leave empty to use <pdb_name>.dat.",
         )
         parser.add_argument(
             "--traj",
+            "-o",
             default=None,
             metavar="TRAJ",
             help="Output trajectory file produced by the MD run. No trajectory will be saved if not provided.",
@@ -48,8 +53,8 @@ class MDRunCommand:
             "--xtc-freq",
             metavar="XTC_FREQ",
             type=float,
-            default=1.0,
-            help="Frequency (in ps) to write frames to the XTC trajectory (default: 1.0 ps).",
+            default=50.0,
+            help="Frequency (in ps) to write frames to the XTC trajectory (default: 50.0 ps).",
         )
         parser.add_argument(
             "--checkpnt",
@@ -74,12 +79,12 @@ class MDRunCommand:
             if args.index.shape[1] != 2:
                 raise ValueError("Index file must have shape (N, 2) for pairs of atoms.")
         return execute(
-            pdb_file=args.pdb,
+            pdb_file=Path(args.pdb),
             index=args.index,
-            xtc_file=args.traj,
-            colvar_file=args.colvar,
+            xtc_file=Path(args.traj) if args.traj is not None else None,
+            colvar_file=Path(args.colvar) if args.colvar is not None else None,
             time_ns=args.time,
             xtc_freq_ps=args.xtc_freq,
-            checkpnt_file=args.checkpnt,
-            final_pdb=args.final_pdb,
+            checkpnt_file=Path(args.checkpnt) if args.checkpnt is not None else None,
+            final_pdb=Path(args.final_pdb) if args.final_pdb is not None else None,
         )
