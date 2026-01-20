@@ -77,7 +77,7 @@ def print_com_dist(
         ab_chains: list[str] = ["B", "C"],
         file: TextIO | None = None,
 ) -> None:
-    ca_idx = native_contact.contacts_ca()
+    ca_idx = native_contact.contacts_ca
     ag = []
     ab = []
     for cag in ag_chains:
@@ -95,19 +95,17 @@ def print_com_dist(
     sprint("com_dist: DISTANCE ATOMS=com_ab,com_ag NOPBC", file=file)
 
 def print_latent_variables(
-        spib_model: PathLike,
-        index_file: PathLike,
+        model: SPIBResult,
+        index: np.ndarray,
         file: TextIO | None = None,
 ) -> None:
 
-    idx = np.load(str(index_file))
-    model = SPIBResult.from_file(str(spib_model))
     wt = model.apparent_weight
     bias = model.apparent_bias
 
-    n_cvs = idx.shape[0]
+    n_cvs = index.shape[0]
 
-    for i, (x, y) in enumerate(idx):
+    for i, (x, y) in enumerate(index):
         sprint(f"d_{i}: DISTANCE ATOMS={x+1},{y+1} NOPBC", file=file)
     for i, b in enumerate(bias):
         sprint(f"b_{i}: CONSTANT VALUE={b[0]:.6f}", file=file)
@@ -123,7 +121,7 @@ def print_latent_variables(
 
 def print_tail(nc: NativeContact, file: TextIO | None = None) -> None:
 
-    dist = nc.ref_ifd()[0] + 4.0
+    dist = nc.ref_ifd[0] + 4.0
 
     sprint('''METAD ...
                 LABEL=metad
@@ -185,7 +183,7 @@ def print_plumed(
     if not isinstance(spib_model, SPIBResult):
         spib_model = SPIBResult.from_file(str(spib_model))
     if not isinstance(index_file, np.ndarray):
-        index_file = np.load(str(index_file))
+        index = np.load(str(index_file))
 
     traj = md.load(str(input_path))
 
@@ -205,7 +203,7 @@ def print_plumed(
         missing = set(ab_chains).difference(set(chain_map.keys()))
         raise ValueError(f"Antibody chains not found in topology: {missing}")
 
-    nc = NativeContact(str(input_path), [
+    nc = NativeContact(traj, [
         f"chainid {" ".join(map(str, ag_chain_idx))} and mass > 1.1",
         f"chainid {" ".join(map(str, ab_chain_idx))} and mass > 1.1"
     ])
@@ -220,10 +218,10 @@ def print_plumed(
         print_com_dist(nc, file=stream)
         print_separator(file=stream)
         print_comment("Latent variables", file=stream)
-        print_latent_variables(spib_model, index_file, file=stream)
+        print_latent_variables(spib_model, index, file=stream)
         print_separator(file=stream)
         print_comment("Native contacts", file=stream)
-        nc.print_plumed(file=stream)
+        nc.print_plumed(header=False, filename=stream)
         print_separator(file=stream)
         print_tail(nc, file=stream)
     finally:

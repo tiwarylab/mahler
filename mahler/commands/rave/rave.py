@@ -24,6 +24,7 @@ def execute(
     colvar_files = Path(file_path)
     if colvar_files.is_dir():
         colvar_files = [str(p) for p in colvar_files.glob(f"*.{suffix}") if p.is_file()]
+        LOGGER.info(f"Found {len(colvar_files)} colvar files.")
     else:
         raise ValueError(f"{file_path} is not a directory.")
     if len(colvar_files) == 0:
@@ -34,9 +35,19 @@ def execute(
     output_path = Path(output_path)
     output_path.mkdir(parents=True, exist_ok=True)
 
-    all_outputs_exist = all(file_exists(_get_output_filename(c, output_path, suffix)) for c in colvar_files)
+    all_outputs_exist = all(
+        file_exists(_get_output_filename(c, output_path, suffix)) 
+        for c in colvar_files
+    )
     if all_outputs_exist and file_exists(output_path / "index.npy"):
         LOGGER.info("Looks like AMINO has been finished. Skipping AMINO selection.")
+
+        with open(output_path / "amino_result.json", "r") as f:
+            result = json.load(f)        
+            print(result)
+        with open(output_path / "amino_result.txt", "w") as f:
+            f.write("\n".join(_parse_result(topology, result)))
+        LOGGER.info(f"AMINO selected {len(result)} CVs.")
     else:
         if not (output_path / "amino_result.json").exists():
             LOGGER.info("Running AMINO to select important CVs.")
@@ -48,19 +59,20 @@ def execute(
             LOGGER.info("AMINO result file already exists. Loading existing results.")
             with open(output_path / "amino_result.json", "r") as f:
                 result = json.load(f)        
-            for c in colvar_files:
-                _select(c, output_path, result)
-
-    _parse_result(topology, result)
-    index = _parse_index_from_result(result)
-    np.save(output_path / "index.npy", index)
+        for c in colvar_files:
+            _select(c, output_path, result)
+        LOGGER.info(f"AMINO selected {len(result)} CVs.")
+        with open(output_path / "amino_result.txt", "w") as f:
+            f.write("\n".join(_parse_result(topology, result)))
+        index = _parse_index_from_result(result)
+        np.save(output_path / "index.npy", index)
 
     # SPIB
     if (output_path / "spib_model.pkl").exists():
         LOGGER.info("SPIB model already exists. Skipping SPIB training.")
     else:
         spib = SPIBProcess(
-            output_path.glob(f"*.{suffix}"),
+            traj = list(output_path.glob(f"*.{suffix}")),
             init="tica:50"
         )
         result = spib.run(time_lag=100, lr_scheduler_gamma=0.9)
@@ -101,7 +113,7 @@ def _parse_result(topology: PathLike[str], result) -> list[int]:
     """Parse AMINO result to obtain selected residue indices."""
 
     import mdtraj as md
-    from af2rave.feature import chimera_representation, atom_name
+    from af2rave.feature import chimera_representation
     
     top = md.load(topology).topology
     commands = []

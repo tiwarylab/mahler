@@ -1,3 +1,6 @@
+from typing import TextIO
+import os
+
 import mdtraj as md
 import numpy as np
 
@@ -141,15 +144,26 @@ class NativeContact:
         
         return frac_of_contacts
     
-    def print_plumed(self, filename: str | None = None) -> None:
+    def print_plumed(self,
+            header: bool = True,
+            filename: str | os.PathLike[str] | TextIO | None = None) -> None:
         '''
         Print the plumed input file for the native contacts.
         Provide a filename to write to, or None to print to stdout.
         '''
 
-        f = open(filename, "w") if filename else None
+        f: TextIO | None
+        should_close = False
+        if filename is None:
+            f = None
+        elif hasattr(filename, "write"):
+            f = filename  # already a TextIO-like object
+        else:
+            f = open(filename, "w")
+            should_close = True
 
-        print("UNITS LENGTH=A", file=f)  
+        if header:
+            print("UNITS LENGTH=A", file=f)  
         print("cmap: CONTACTMAP ...", file=f)
         for i, (a, b) in enumerate(self._native_contacts):
             print((f"    ATOMS{i+1}={a+1},{b+1} "
@@ -157,8 +171,8 @@ class NativeContact:
                    f"WEIGHT{i+1}={self._inv_S:.7f}"
             ), file=f)
         print("    SUM\n...", file=f)
-        print("PRINT ARG=cmap FILE=COLVAR.dat", file=f)
+        if header:
+            print("PRINT ARG=cmap FILE=COLVAR.dat", file=f)
 
-        if f:
+        if should_close and f is not None:
             f.close()
-        
