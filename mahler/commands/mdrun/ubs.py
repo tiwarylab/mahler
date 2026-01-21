@@ -2,10 +2,10 @@ from os import PathLike
 from collections.abc import Sequence
 from pathlib import Path
 
-import mdtraj as md
 import numpy as np
 import openmm.app as app
 from af2rave.simulation import UnbiasedSimulation
+from mahler.utils.topology import find_protein_subset
 
 import logging
 LOGGER = logging.getLogger("mahler.mdrun")
@@ -36,7 +36,7 @@ def execute(
         xtc_rep = app.xtcreporter.XTCReporter(
             str(xtc_file),
             reportInterval=report_interval,
-            atomSubset=_find_protein_subset(pdb_file),
+            atomSubset=find_protein_subset(pdb_file),
         )
         LOGGER.info(f"XTC trajectory will be saved to {xtc_file}.")
     else:
@@ -70,9 +70,3 @@ def execute(
     if checkpnt_file:
         ubs.save_checkpoint(checkpnt_file)
     return 0
-
-def _find_protein_subset(pdb_file: PathLike[str]) -> np.ndarray:
-    """Return atom indices corresponding to protein residues."""
-    traj = md.load_pdb(pdb_file)
-    protein_atoms = traj.topology.select("protein")
-    return protein_atoms

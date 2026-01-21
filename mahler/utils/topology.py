@@ -1,5 +1,7 @@
 import mdtraj as md
+import numpy as np
 import logging
+from os import PathLike
 
 from collections.abc import Sequence
 
@@ -45,3 +47,9 @@ def chain_idx_from_chain_id(
     return {
         c.chain_id: c.index for c in top_pro.chains
     }
+
+def find_protein_subset(pdb_file: PathLike[str]) -> np.ndarray:
+    """Return atom indices corresponding to protein residues."""
+    traj = md.load_pdb(pdb_file)
+    protein_atoms = traj.topology.select("protein")
+    return protein_atoms
