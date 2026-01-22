@@ -27,6 +27,14 @@ class IfMetadCommand:
             help="Output directory to save traj/colvar produced by the MD run.",
         )
         parser.add_argument(
+            "--replica",
+            "-r",
+            metavar="REPLICA_ID",
+            type=int,
+            default=0,
+            help="Replica ID for this simulation (default: 0).",
+        )
+        parser.add_argument(
             "--plumed",
             "-p",
             metavar="PLUMED_SCRIPT",
@@ -36,8 +44,8 @@ class IfMetadCommand:
             "--time", 
             metavar="TIME",
             type=int,
-            default=50,
-            help="Total simulation time in nanoseconds (default: 50 ns).",
+            default=100,
+            help="Maximum simulation time in nanoseconds (default: 100 ns).",
         )
         parser.add_argument(
             "--xtc-freq",
@@ -45,12 +53,6 @@ class IfMetadCommand:
             type=float,
             default=10.0,
             help="Frequency (in ps) to write frames to the XTC trajectory (default: 10.0 ps).",
-        )
-        parser.add_argument(
-            "--final-pdb",
-            metavar="FINAL_PDB",
-            default=None,
-            help="Path to save the final PDB structure after simulation.",
         )
         parser.add_argument(
             "--temperature", "-t",
@@ -65,11 +67,10 @@ class IfMetadCommand:
         from .ifmetad import execute
         return execute(
             pdb_file=Path(args.pdb),
-            xtc_file=Path(args.out),
-            colvar_file=Path(args.out),
+            out_path=Path(args.out),
+            replica_id=args.replica,
             plumed=Path(args.plumed),
             time_ns=args.time,
             xtc_freq_ps=args.xtc_freq,
-            final_pdb=Path(args.final_pdb) if args.final_pdb is not None else None,
             temperature=args.temperature,
-        )
+)

@@ -9,6 +9,8 @@ from af2rave.spib import SPIBResult
 from mahler.utils.contact import NativeContact
 from mahler.utils.topology import chain_idx_from_chain_id, check_chains
 
+import logging
+LOGGER = logging.getLogger("mahler.rave")
 
 def sprint(*args: str, indent: int = 4, file: TextIO | None = None, **kwargs) -> None:
     """Formatted print:
@@ -122,6 +124,8 @@ def print_latent_variables(
 def print_tail(nc: NativeContact, file: TextIO | None = None) -> None:
 
     dist = nc.ref_ifd[0] + 4.0
+    LOGGER.debug(f"Using contacting CA: {nc.contacts_ca}")
+    LOGGER.info(f"Setting committor max distance to {dist:.2f} Å (IFD + 4 Å).")
 
     sprint('''METAD ...
                 LABEL=metad
@@ -194,11 +198,13 @@ def print_plumed(
     chain_map = chain_idx_from_chain_id(top, protein_only=True)
     try:
         ag_chain_idx = [chain_map[c] for c in ag_chains]
+        LOGGER.debug(f"Antigen chains resolved to chain {ag_chain_idx}")
     except KeyError:
         missing = set(ag_chains).difference(set(chain_map.keys()))
         raise ValueError(f"Antigen chains not found in topology: {missing}")
     try:
         ab_chain_idx = [chain_map[c] for c in ab_chains]
+        LOGGER.debug(f"Antibody chains resolved to chain {ab_chain_idx}")
     except KeyError:
         missing = set(ab_chains).difference(set(chain_map.keys()))
         raise ValueError(f"Antibody chains not found in topology: {missing}")
@@ -215,7 +221,7 @@ def print_plumed(
         print_wholemolecule(top, file=stream)
         print_separator(file=stream)
         print_comment("Interface residue distance", file=stream)
-        print_com_dist(nc, file=stream)
+        print_com_dist(nc, ag_chains, ab_chains, file=stream)
         print_separator(file=stream)
         print_comment("Latent variables", file=stream)
         print_latent_variables(spib_model, index, file=stream)

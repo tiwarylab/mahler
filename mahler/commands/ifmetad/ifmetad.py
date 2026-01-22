@@ -21,32 +21,39 @@ from os import PathLike
 
 def execute(
         pdb_file: Path,
-        xtc_file: Path,
-        colvar_file: Path,
+        out_path: Path,
+        replica_id: int,
         plumed: PathLike[str],
-        time_ns: int = 50,
-        xtc_freq_ps: float = 10.0,
-        final_pdb: PathLike[str] = None,
-        temperature: float = 298.15,
+        time_ns: int,
+        xtc_freq_ps: float,
+        temperature: float,
 ) -> int:
 
+    # setting up the trajectory reporter
     step_ps = 0.002
     steps = int(time_ns * 1000 / step_ps)
-
-    # setting up the trajectory reporter
     report_interval = int(xtc_freq_ps / step_ps)
-    if xtc_file.is_dir():
-        i, xtc_file = _find_next_name(xtc_file, pdb_file, "xtc")
+
+    # setting up output paths
+    if not out_path.is_dir() and out_path.exists():
+        LOGGER.error(f"Output path {out_path} exists and is not a directory.")
+        return 1
+    out_path.mkdir(parents=True, exist_ok=True)
+    
+    prefix = f"{pdb_file.stem}_r.{replica_id}"
+    xtc_file = out_path / f"{prefix}.xtc"
+    colvar_file = out_path / f"{prefix}.dat"
+    hills_file = out_path / f"{prefix}.hills"
+    final_pdb = out_path / f"{prefix}.pdb"
+    plumed_dat = out_path / f"{prefix}.plumed"
+
     xtc_rep = app.xtcreporter.XTCReporter(
         str(xtc_file),
         reportInterval=report_interval,
         atomSubset=find_protein_subset(pdb_file),
     )
     LOGGER.info(f"XTC trajectory will be saved to {xtc_file}.")
-
-    # setting up PLUMED colvar redirection
-    if colvar_file.is_dir():
-        colvar_file = colvar_file / (f"{pdb_file.stem}_{i:02d}.dat")
+    LOGGER.info(f"PLUMED COLVAR will be saved to {colvar_file}.")
 
     if not file_exists(plumed, non_empty=True):
         LOGGER.error(f"PLUMED script {plumed} does not exist or is empty.")
@@ -54,8 +61,10 @@ def execute(
     with open(plumed, "r") as f:
         plumed_script = f.read()
         plumed_script = plumed_script.replace("COLVAR", str(colvar_file))
-        plumed_script = plumed_script.replace("HILLS", str(colvar_file.with_suffix(".hills")))
+        plumed_script = plumed_script.replace("HILLS", str(hills_file))
     plumed_force = PlumedForce(plumed_script)
+    with open(plumed_dat, "w") as f:
+        f.write(plumed_script)
     LOGGER.info(f"Using PLUMED script from {plumed}.")
 
     forcefield = app.ForceField("amber14/protein.ff14SB.xml", "amber14/tip3p.xml")
@@ -69,21 +78,5 @@ def execute(
     )
 
     ubs.run(steps)
-    if final_pdb:
-        ubs.save_pdb(final_pdb)
+    ubs.save_pdb(str(final_pdb))
     return 0
-
-def _find_next_name(
-        base_dir: Path,
-        pdb_file: Path,
-        postfix: str = "xtc",
-):
-    for i in range(1, 100):
-        candidate = base_dir / f"{pdb_file.stem}_{i:02d}.{postfix}"
-        if not file_exists(candidate, non_empty=False):
-            # calling dibs on this name to avoid race conditions over other replicas
-            candidate.touch()
-            return i, candidate
-    raise FileExistsError(
-        f"Could not find a free name for {pdb_file.stem} in {base_dir} after 99 attempts."
-    )
