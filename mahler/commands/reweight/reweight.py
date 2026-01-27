@@ -20,7 +20,7 @@ from mahler.proteinmpnn import ScoreMPNN
 from mahler.utils.fasta import parse_fasta
 from mahler.utils.poisson import bootstrap, fit_poisson
 from mahler.utils.topology import check_chains
-from mahler.utils.os import list_files
+from mahler.utils.os import list_files, file_exists
 
 __all__ = ["execute", "score_sequence", "reweighted_time"]
 
@@ -34,6 +34,7 @@ def execute(
     colvar_directory: Pathish,
     sequence_fasta: Pathish,
     output_directory: Pathish,
+    temperature: float = 298.0,
     score_directory: Pathish | None = None,
     n_bootstrap: int = 1000,
     topology_file: Pathish | None = None,
@@ -58,6 +59,8 @@ def execute(
     all_times: list[float] = []
     all_rw_times: list[np.ndarray] = []
 
+    LOGGER.info(f"Using temperature {temperature:.2f} K for reweighting.")
+
     for traj_file, colvar_file in files_mapping.items():
         LOGGER.info(
             "Processing trajectory file %s with colvar file %s.",
@@ -73,6 +76,7 @@ def execute(
             stride=500,
             frames_per_batch=10,
             topology_file=topology_file,
+            temperature=temperature,
         )
         all_times.append(time)
         all_rw_times.append(rw_time)
@@ -157,21 +161,28 @@ def score_sequence(
     if frames_per_batch <= 0:
         msg = f"frames_per_batch must be positive, received {frames_per_batch}."
         raise ValueError(msg)
+    
+    if cache is not None:
+        # check if cache exists and is non-empty
+        if file_exists(cache) > 0:
+            result = np.load(str(cache), allow_pickle=False)
+            LOGGER.info(f"Loaded scores from cache file {cache}.")
+            return result
+        else:
+            LOGGER.warning(f"Cache file {cache} does not exist or is empty. Proceeding to score trajectory.")
 
     try:
         traj: md.Trajectory = md.load(str(traj_file), top=topology_file)
     except Exception as e:
         msg = f"Failed to load trajectory file {traj_file} with topology {topology_file}: {e}"
         raise RuntimeError(msg) from e
+    LOGGER.info(f"Loaded trajectory {traj_file} with {len(traj)} frames.")
 
-    if cache is not None:
-        # check if cache exists and is non-empty
-        if Path(cache).is_file() and Path(cache).stat().st_size > 0:
-            result = np.load(str(cache), allow_pickle=False)
-            LOGGER.info(f"Loaded scores from cache file {cache}.")
-            return result
-        else:
-            LOGGER.warning(f"Cache file {cache} does not exist or is empty. Proceeding to score trajectory.")
+    LOGGER.info("Centering and imaging molecules in trajectory.")
+    traj = traj.image_molecules(
+        inplace=True,
+        anchor_molecules=[chain.atoms for chain in traj.topology.chains],
+    )
 
     scorer = ScoreMPNN()
     scores: list[np.ndarray] = []
@@ -204,12 +215,13 @@ def reweighted_time(
     colvar_file: Pathish,
     cache: Pathish | None = None,
     stride: int = 500,
-    temperature: float = 310.0,
+    temperature: float = 298.0,
     decoding_order: Sequence[str] | None = None,
     frames_per_batch: int = 1,
     topology_file: Pathish | None = None,
 ) -> tuple[float, np.ndarray]:
     """Return WT and per-sequence reweighted times for a trajectory."""
+
     if stride <= 0:
         msg = f"Stride must be positive, received {stride}."
         raise ValueError(msg)
