@@ -56,6 +56,13 @@ class ReweightCommand:
             required=False,
             help="Topology file for the trajectories (if needed).",   
         )
+        parser.add_argument(
+            "--temperature",
+            "-T",
+            type=float,
+            default=298.0,
+            help="Temperature in Kelvin for reweighting (default: 298 K).",
+        )
 
     @staticmethod
     def run(args: argparse.Namespace) -> int:
@@ -72,4 +79,5 @@ class ReweightCommand:
             output_directory=args.output,
             n_bootstrap=args.bootstrap,
             topology_file=args.topology,
+            temperature=args.temperature
         )
